@@ -23,6 +23,7 @@ function preload() {
     this.load.image('ship', 'assets/spaceShips_001.png');
     this.load.image('otherPlayer', 'assets/enemyBlack5.png');
     this.load.image('star', 'assets/star_gold.png');
+    //this.load.image('bullet', 'assets/bullet.png')
 }
 
 function create() {
@@ -49,6 +50,10 @@ function create() {
         });
     });
     this.cursors = this.input.keyboard.createCursorKeys();
+    this.keyW=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    this.keyA=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.keyD=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.keySpace=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.socket.on('playerMoved', function (playerInfo) {
         self.otherPlayers.getChildren().forEach(function (otherPlayer) {
             if (playerInfo.playerId === otherPlayer.playerId) {
@@ -75,15 +80,15 @@ function create() {
 
 function update() {
     if (this.ship) {
-        if (this.cursors.left.isDown) {
+        if (this.cursors.left.isDown || this.keyA.isDown) {
             this.ship.setAngularVelocity(-150);
-        } else if (this.cursors.right.isDown) {
+        } else if (this.cursors.right.isDown || this.keyD.isDown) {
             this.ship.setAngularVelocity(150);
         } else {
             this.ship.setAngularVelocity(0);
         }
 
-        if (this.cursors.up.isDown) {
+        if (this.cursors.up.isDown || this.keyW.isDown) {
             this.physics.velocityFromRotation(this.ship.rotation + 1.5, 100, this.ship.body.acceleration);
         } else {
             this.ship.setAcceleration(0);

@@ -1,4 +1,6 @@
 var express = require('express');
+var favicon = require('serve-favicon');
+var path = require('path');
 var app = express();
 var server = require('http').Server(app);
 var io = require('socket.io').listen(server);
@@ -12,6 +14,7 @@ var scores = {
     red: 0
 };
 
+app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')))
 app.use(express.static(__dirname + '/public'));
 
 app.get('/', function (req, res) {
