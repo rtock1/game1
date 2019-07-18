@@ -32,8 +32,11 @@ function create() {
     this.socket = io();
     this.otherPlayers = this.physics.add.group();
     var bulletHit = this.physics.add.collider(this.bullets, this.otherPlayers,function (bullet, ship){
-        // debugger;
         if (bullet.playerId !== ship.playerId){
+            self.socket.emit('playerHit', {
+                playerId: ship.playerId,
+            });
+            //debugger;
             self.socket.emit('bulletDestroyed', {
                 bulletId: bullet.bulletId,
                 playerId : bullet.playerId
@@ -49,6 +52,24 @@ function create() {
                 addOtherPlayers(self, players[id]);
             }
         });
+    });
+    this.socket.on('playerHit', function(playerData){
+        Object.keys(playerData.players).forEach(function (id) {
+            // debugger;
+            if (playerData.players[id].playerId === playerData.playerId.playerId) {
+                if (playerData.players[id].playerId === self.socket.id){
+                    self.ship.destroy()
+                    self.ship=null
+                    setTimeout(100000000000)
+                } else {
+                    self.otherPlayers.getChildren().forEach(function (otherPlayer) {
+                        if (playerData.players[id].playerId === otherPlayer.playerId){
+                            otherPlayer.destroy()
+                        }
+                    });
+                };
+            };
+        });     
     });
     this.socket.on('newPlayer', function (playerInfo) {
         addOtherPlayers(self, playerInfo);
@@ -119,7 +140,6 @@ function update() {
         } else {
             this.ship.setAngularVelocity(0);
         }
-
         if (this.cursors.up.isDown || this.keyW.isDown) {
             this.physics.velocityFromRotation(this.ship.rotation + Math.PI/2, 100, this.ship.body.acceleration);
         } else {

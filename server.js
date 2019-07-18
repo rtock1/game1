@@ -91,6 +91,9 @@ io.on('connection', function (socket) {
     socket.on('bulletDestroyed', function(bulletData){
         socket.broadcast.emit('bulletDestroyed', bulletData)
     });
+    socket.on('playerHit', function(playerId){
+        io.emit('playerHit', {playerId: playerId, players:players})
+    });
 });
 
 server.listen(2733, function () {
