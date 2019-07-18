@@ -136,7 +136,7 @@ function update() {
             bullet.setAngle(this.ship.angle);
             bullet.body.setVelocity(Math.cos(this.ship.rotation+(Math.PI/2))*400,Math.sin(this.ship.rotation+(Math.PI/2))*400)
             this.physics.velocityFromRotation(this.ship.rotation+(3*Math.PI/2), 100, this.ship.body.acceleration);
-        }
+        };
         this.physics.world.wrap(this.ship, 5);
 
         // emit player movement
@@ -208,6 +208,7 @@ function addOtherPlayers(self, playerInfo) {
     }
     otherPlayer.playerId = playerInfo.playerId;
     self.otherPlayers.add(otherPlayer);
+    otherPlayer.body.immovable = true;
 }
 function addOtherBullet(self,bulletData){
     // debugger;
