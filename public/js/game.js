@@ -1,8 +1,8 @@
 var config = {
     type: Phaser.AUTO,
     parent: 'phaser-example',
-    width: 800,
-    height: 600,
+    width: 1000,
+    height: 1000,
     physics: {
         default: 'arcade',
         arcade: {
@@ -18,18 +18,25 @@ var config = {
 };
 
 var game = new Phaser.Game(config);
-
+var counter = 1
 function preload() {
     this.load.image('ship', 'assets/spaceShips_001.png');
     this.load.image('otherPlayer', 'assets/enemyBlack5.png');
     this.load.image('star', 'assets/star_gold.png');
-    //this.load.image('bullet', 'assets/bullet.png')
+    this.load.image('bullet', 'assets/bullet.png')
 }
 
 function create() {
     var self = this;
+    this.bullets = this.physics.add.group();
     this.socket = io();
     this.otherPlayers = this.physics.add.group();
+    var bulletHit = this.physics.add.collider(this.bullets, this.otherPlayers,function (bullet, ship){
+        // debugger;
+        if (bullet.playerId !== ship.playerId){
+            bullet.destroy()
+        }
+    });
     this.socket.on('currentPlayers', function (players) {
         Object.keys(players).forEach(function (id) {
             if (players[id].playerId === self.socket.id) {
@@ -50,10 +57,10 @@ function create() {
         });
     });
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keyW=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-    this.keyA=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.keyD=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.keySpace=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.socket.on('playerMoved', function (playerInfo) {
         self.otherPlayers.getChildren().forEach(function (otherPlayer) {
             if (playerInfo.playerId === otherPlayer.playerId) {
@@ -76,9 +83,23 @@ function create() {
             this.socket.emit('starCollected');
         }, null, self);
     });
+    this.socket.on('bulletMoved', function (bulletData){
+        // console.log('other player updated bullet',bulletData)
+        self.bullets.getChildren().forEach(function (otherBullet) {
+            if (bulletData.bulletId === otherBullet.bulletId) {
+                otherBullet.setRotation(bulletData.rotation);
+                otherBullet.setPosition(bulletData.x, bulletData.y);
+            }
+        });
+    });
+    this.socket.on('bulletCreate', function (bulletData){
+        // console.log('other player gotten bullet', bulletData)
+        addOtherBullet(self, bulletData)
+    })
 }
 
 function update() {
+    var self = this;
     if (this.ship) {
         if (this.cursors.left.isDown || this.keyA.isDown) {
             this.ship.setAngularVelocity(-150);
@@ -89,11 +110,22 @@ function update() {
         }
 
         if (this.cursors.up.isDown || this.keyW.isDown) {
-            this.physics.velocityFromRotation(this.ship.rotation + 1.5, 100, this.ship.body.acceleration);
+            this.physics.velocityFromRotation(this.ship.rotation + Math.PI/2, 100, this.ship.body.acceleration);
         } else {
             this.ship.setAcceleration(0);
         }
-
+        if (Phaser.Input.Keyboard.JustDown(this.keySpace)) {
+            const bullet = self.physics.add.sprite(this.ship.x+Math.cos(this.ship.rotation+(Math.PI/2))*50,
+                    this.ship.y+Math.sin(this.ship.rotation+(Math.PI/2))*50, 'bullet').setOrigin(0.5, 0.5).setDisplaySize(5, 45);
+            bullet.playerId=self.socket.id;
+            bullet.bulletId=counter;
+            // console.log('shot bullet');
+            counter++
+            this.bullets.add(bullet);
+            bullet.setAngle(this.ship.angle);
+            bullet.body.setVelocity(Math.cos(this.ship.rotation+(Math.PI/2))*400,Math.sin(this.ship.rotation+(Math.PI/2))*400)
+            this.physics.velocityFromRotation(this.ship.rotation+(3*Math.PI/2), 100, this.ship.body.acceleration);
+        }
         this.physics.world.wrap(this.ship, 5);
 
         // emit player movement
@@ -110,6 +142,33 @@ function update() {
             y: this.ship.y,
             rotation: this.ship.rotation
         };
+        //emit bullet movement
+        self.bullets.getChildren().forEach(function (bullet) {
+            if (bullet.x<0 || bullet.y<0 || bullet.x>config.width || bullet.y>config.height){
+                // debugger;
+                bullet.destroy()
+            } else if (!bullet.oldPosition && bullet.playerId === self.socket.id){
+                self.socket.emit('bulletCreated', {
+                    x: bullet.x, 
+                    y: bullet.y, 
+                    rotation: bullet.rotation,  
+                    bulletId: bullet.bulletId,
+                    playerId: bullet.playerId,
+                });
+            } else if (bullet.oldPosition && (bullet.oldPosition.x !== bullet.x || bullet.oldPosition.y !== bullet.y) && bullet.playerId === self.socket.id) {
+                self.socket.emit('bulletMovement', {
+                    x: bullet.x,
+                    y: bullet.y,
+                    rotation: bullet.rotation,
+                    bulletId: bullet.bulletId,
+                    playerId: bullet.playerId,
+                 });
+            }
+            bullet.oldPosition = {
+                x:bullet.x,
+                y:bullet.y,
+            }  
+        });
     }
 }
 
@@ -120,7 +179,7 @@ function addPlayer(self, playerInfo) {
     } else {
         self.ship.setTint(0xff0000);
     }
-    self.ship.setDrag(75);
+    self.ship.setDrag(0);
     self.ship.setAngularDrag(100);
     self.ship.setMaxVelocity(250);
 }
@@ -135,3 +194,11 @@ function addOtherPlayers(self, playerInfo) {
     otherPlayer.playerId = playerInfo.playerId;
     self.otherPlayers.add(otherPlayer);
 }
+function addOtherBullet(self,bulletData){
+    // debugger;
+    const otherBullet = self.add.sprite(bulletData.x, bulletData.y, 'bullet').setOrigin(0.5, 0.5).setDisplaySize(5, 45);
+    otherBullet.bulletId = bulletData.bulletId;
+    otherBullet.playerId = bulletData.playerId;
+    self.bullets.add(otherBullet);
+    // otherBullet.setPosition(bulletData.x, bulletData.y);
+};

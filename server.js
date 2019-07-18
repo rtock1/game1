@@ -80,6 +80,14 @@ io.on('connection', function (socket) {
         io.emit('starLocation', star);
         io.emit('scoreUpdate', scores);
     });
+    socket.on('bulletMovement', function(bulletData){
+        console.log({ msg: 'bulletMovement', socket: socket.id, bullet: bulletData });
+        socket.broadcast.emit('bulletMoved', bulletData)
+    });
+    socket.on('bulletCreated', function(bulletData){
+        console.log({ msg: 'bulletCreated', socket: socket.id, bullet: bulletData });
+        socket.broadcast.emit('bulletCreate', bulletData)
+    });
 });
 
 server.listen(2733, function () {
