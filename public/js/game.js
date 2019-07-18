@@ -34,6 +34,10 @@ function create() {
     var bulletHit = this.physics.add.collider(this.bullets, this.otherPlayers,function (bullet, ship){
         // debugger;
         if (bullet.playerId !== ship.playerId){
+            self.socket.emit('bulletDestroyed', {
+                bulletId: bullet.bulletId,
+                playerId : bullet.playerId
+            });
             bullet.destroy()
         }
     });
@@ -96,6 +100,13 @@ function create() {
         // console.log('other player gotten bullet', bulletData)
         addOtherBullet(self, bulletData)
     })
+    this.socket.on('bulletDestroyed', function (bulletData){
+        self.bullets.getChildren().forEach(function (otherBullet) {
+            if (bulletData.playerId === otherBullet.playerId && bulletData.bulletId === otherBullet.bulletId) {
+                otherBullet.destroy();
+            };
+        });
+    });
 }
 
 function update() {
@@ -146,6 +157,10 @@ function update() {
         self.bullets.getChildren().forEach(function (bullet) {
             if (bullet.x<0 || bullet.y<0 || bullet.x>config.width || bullet.y>config.height){
                 // debugger;
+                self.socket.emit('bulletDestroyed', {
+                    bulletId: bullet.bulletId,
+                    playerId : bullet.playerId
+                });
                 bullet.destroy()
             } else if (!bullet.oldPosition && bullet.playerId === self.socket.id){
                 self.socket.emit('bulletCreated', {
@@ -200,5 +215,4 @@ function addOtherBullet(self,bulletData){
     otherBullet.bulletId = bulletData.bulletId;
     otherBullet.playerId = bulletData.playerId;
     self.bullets.add(otherBullet);
-    // otherBullet.setPosition(bulletData.x, bulletData.y);
 };
