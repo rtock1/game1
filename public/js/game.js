@@ -18,12 +18,16 @@ var config = {
 };
 
 var game = new Phaser.Game(config);
+var reloaded=true;
 var counter = 1
 function preload() {
     this.load.image('ship', 'assets/spaceShips_001.png');
     this.load.image('otherPlayer', 'assets/enemyBlack5.png');
     this.load.image('star', 'assets/star_gold.png');
     this.load.image('bullet', 'assets/bullet.png')
+    this.load.spritesheet('reload', 
+        'assets/reload.png',
+        { frameWidth: 100, frameHeight: 100 });
 }
 
 function create() {
@@ -31,6 +35,20 @@ function create() {
     this.bullets = this.physics.add.group();
     this.socket = io();
     this.otherPlayers = this.physics.add.group();
+    this.anims.create({
+        key: 'shoot',
+        frames: this.anims.generateFrameNumbers('reload', { start: 1, end: 1 }),
+        frameRate: 1,
+        repeat: 0
+    });
+    this.anims.create({
+        key: 'reloaded',
+        frames: this.anims.generateFrameNumbers('reload', { start: 0, end: 0 }),
+        frameRate: 1,
+        repeat: 0
+    });
+    player = this.physics.add.sprite(53, 947, 'reload');
+    // this.reload=game.add.sprite(0,900,'reload')
     var bulletHit = this.physics.add.collider(this.bullets, this.otherPlayers,function (bullet, ship){
         if (bullet.playerId !== ship.playerId){
             self.socket.emit('playerHit', {
@@ -58,9 +76,8 @@ function create() {
             // debugger;
             if (playerData.players[id].playerId === playerData.playerId.playerId) {
                 if (playerData.players[id].playerId === self.socket.id){
-                    self.ship.destroy()
-                    self.ship=null
-                    setTimeout(100000000000)
+                    self.ship.destroy();
+                    self.ship=null;
                 } else {
                     self.otherPlayers.getChildren().forEach(function (otherPlayer) {
                         if (playerData.players[id].playerId === otherPlayer.playerId){
@@ -104,12 +121,13 @@ function create() {
     this.socket.on('starLocation', function (starLocation) {
         if (self.star) self.star.destroy();
         self.star = self.physics.add.image(starLocation.x, starLocation.y, 'star');
-        self.physics.add.overlap(self.ship, self.star, function () {
-            this.socket.emit('starCollected');
-        }, null, self);
+        if (self.ship){
+            self.physics.add.overlap(self.ship, self.star, function () {
+                this.socket.emit('starCollected');
+            }, null, self);
+        }
     });
     this.socket.on('bulletMoved', function (bulletData){
-        // console.log('other player updated bullet',bulletData)
         self.bullets.getChildren().forEach(function (otherBullet) {
             if (bulletData.bulletId === otherBullet.bulletId) {
                 otherBullet.setRotation(bulletData.rotation);
@@ -118,7 +136,6 @@ function create() {
         });
     });
     this.socket.on('bulletCreate', function (bulletData){
-        // console.log('other player gotten bullet', bulletData)
         addOtherBullet(self, bulletData)
     })
     this.socket.on('bulletDestroyed', function (bulletData){
@@ -146,16 +163,23 @@ function update() {
             this.ship.setAcceleration(0);
         }
         if (Phaser.Input.Keyboard.JustDown(this.keySpace)) {
-            const bullet = self.physics.add.sprite(this.ship.x+Math.cos(this.ship.rotation+(Math.PI/2))*50,
-                    this.ship.y+Math.sin(this.ship.rotation+(Math.PI/2))*50, 'bullet').setOrigin(0.5, 0.5).setDisplaySize(5, 45);
-            bullet.playerId=self.socket.id;
-            bullet.bulletId=counter;
-            // console.log('shot bullet');
-            counter++
-            this.bullets.add(bullet);
-            bullet.setAngle(this.ship.angle);
-            bullet.body.setVelocity(Math.cos(this.ship.rotation+(Math.PI/2))*400,Math.sin(this.ship.rotation+(Math.PI/2))*400)
-            this.physics.velocityFromRotation(this.ship.rotation+(3*Math.PI/2), 100, this.ship.body.acceleration);
+            if (reloaded==true){
+                player.anims.play('shoot', true);
+                reloaded=false
+                const bullet = self.physics.add.sprite(this.ship.x+Math.cos(this.ship.rotation+(Math.PI/2))*50,
+                        this.ship.y+Math.sin(this.ship.rotation+(Math.PI/2))*50, 'bullet').setOrigin(0.5, 0.5).setDisplaySize(5, 45);
+                bullet.playerId=self.socket.id;
+                bullet.bulletId=counter;
+                counter++
+                this.bullets.add(bullet);
+                bullet.setAngle(this.ship.angle);
+                bullet.body.setVelocity(Math.cos(this.ship.rotation+(Math.PI/2))*400,Math.sin(this.ship.rotation+(Math.PI/2))*400)
+                this.physics.velocityFromRotation(this.ship.rotation+(3*Math.PI/2), 100, this.ship.body.acceleration);
+                setTimeout(function(){
+                    player.anims.play('reloaded', true)
+                    reloaded=true
+                },750);
+            }
         };
         this.physics.world.wrap(this.ship, 5);
 
@@ -173,38 +197,38 @@ function update() {
             y: this.ship.y,
             rotation: this.ship.rotation
         };
-        //emit bullet movement
-        self.bullets.getChildren().forEach(function (bullet) {
-            if (bullet.x<0 || bullet.y<0 || bullet.x>config.width || bullet.y>config.height){
-                // debugger;
-                self.socket.emit('bulletDestroyed', {
-                    bulletId: bullet.bulletId,
-                    playerId : bullet.playerId
-                });
-                bullet.destroy()
-            } else if (!bullet.oldPosition && bullet.playerId === self.socket.id){
-                self.socket.emit('bulletCreated', {
-                    x: bullet.x, 
-                    y: bullet.y, 
-                    rotation: bullet.rotation,  
-                    bulletId: bullet.bulletId,
-                    playerId: bullet.playerId,
-                });
-            } else if (bullet.oldPosition && (bullet.oldPosition.x !== bullet.x || bullet.oldPosition.y !== bullet.y) && bullet.playerId === self.socket.id) {
-                self.socket.emit('bulletMovement', {
-                    x: bullet.x,
-                    y: bullet.y,
-                    rotation: bullet.rotation,
-                    bulletId: bullet.bulletId,
-                    playerId: bullet.playerId,
-                 });
-            }
-            bullet.oldPosition = {
-                x:bullet.x,
-                y:bullet.y,
-            }  
-        });
     }
+    //emit bullet movement
+    self.bullets.getChildren().forEach(function (bullet) {
+        if (bullet.x<0 || bullet.y<0 || bullet.x>config.width || bullet.y>config.height){
+            // debugger;
+            self.socket.emit('bulletDestroyed', {
+                bulletId: bullet.bulletId,
+                playerId : bullet.playerId
+            });
+            bullet.destroy()
+        } else if (!bullet.oldPosition && bullet.playerId === self.socket.id){
+            self.socket.emit('bulletCreated', {
+                x: bullet.x, 
+                y: bullet.y, 
+                rotation: bullet.rotation,  
+                bulletId: bullet.bulletId,
+                playerId: bullet.playerId,
+            });
+        } else if (bullet.oldPosition && (bullet.oldPosition.x !== bullet.x || bullet.oldPosition.y !== bullet.y) && bullet.playerId === self.socket.id) {
+            self.socket.emit('bulletMovement', {
+                x: bullet.x,
+                y: bullet.y,
+                rotation: bullet.rotation,
+                bulletId: bullet.bulletId,
+                playerId: bullet.playerId,
+                });
+        }
+        bullet.oldPosition = {
+            x:bullet.x,
+            y:bullet.y,
+        }  
+    });
 }
 
 function addPlayer(self, playerInfo) {
