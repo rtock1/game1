@@ -48,13 +48,11 @@ function create() {
         repeat: 0
     });
     player = this.physics.add.sprite(53, 947, 'reload');
-    // this.reload=game.add.sprite(0,900,'reload')
     var bulletHit = this.physics.add.collider(this.bullets, this.otherPlayers,function (bullet, ship){
         if (bullet.playerId !== ship.playerId){
             self.socket.emit('playerHit', {
                 playerId: ship.playerId,
             });
-            //debugger;
             self.socket.emit('bulletDestroyed', {
                 bulletId: bullet.bulletId,
                 playerId : bullet.playerId
@@ -73,7 +71,6 @@ function create() {
     });
     this.socket.on('playerHit', function(playerData){
         Object.keys(playerData.players).forEach(function (id) {
-            // debugger;
             if (playerData.players[id].playerId === playerData.playerId.playerId) {
                 if (playerData.players[id].playerId === self.socket.id){
                     self.ship.destroy();
@@ -140,7 +137,7 @@ function create() {
     })
     this.socket.on('bulletDestroyed', function (bulletData){
         self.bullets.getChildren().forEach(function (otherBullet) {
-            if (bulletData.playerId === otherBullet.playerId && bulletData.bulletId === otherBullet.bulletId) {
+            if (bulletData.playerId === otherBullet.playerId && bulletData.bulletId == otherBullet.bulletId) {
                 otherBullet.destroy();
             };
         });
@@ -201,7 +198,6 @@ function update() {
     //emit bullet movement
     self.bullets.getChildren().forEach(function (bullet) {
         if (bullet.x<0 || bullet.y<0 || bullet.x>config.width || bullet.y>config.height){
-            // debugger;
             self.socket.emit('bulletDestroyed', {
                 bulletId: bullet.bulletId,
                 playerId : bullet.playerId
@@ -255,7 +251,6 @@ function addOtherPlayers(self, playerInfo) {
     otherPlayer.body.immovable = true;
 }
 function addOtherBullet(self,bulletData){
-    // debugger;
     const otherBullet = self.add.sprite(bulletData.x, bulletData.y, 'bullet').setOrigin(0.5, 0.5).setDisplaySize(5, 45);
     otherBullet.bulletId = bulletData.bulletId;
     otherBullet.playerId = bulletData.playerId;

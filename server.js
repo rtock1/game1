@@ -13,7 +13,7 @@ var scores = {
     blue: 0,
     red: 0
 };
-
+var bullets = {};
 app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')))
 app.use(express.static(__dirname + '/public'));
 
@@ -30,7 +30,6 @@ function numOfTeam(players,team){
     return count;
 };
 io.on('connection', function (socket) {
-    console.log('a user connected');
     if(numOfTeam(players,'red')===numOfTeam(players,'blue')){
         var teamChoice=Math.random()<0.5 ? 'red' : 'blue';
     } else {
@@ -44,6 +43,8 @@ io.on('connection', function (socket) {
         playerId: socket.id,
         team: teamChoice,
     };
+    bullets[socket.id] = {
+    }
     // send the players object to the new player
     socket.emit('currentPlayers', players);
     // send the star object to the new player
@@ -54,11 +55,13 @@ io.on('connection', function (socket) {
     socket.broadcast.emit('newPlayer', players[socket.id]);
 
     socket.on('disconnect', function () {
-        console.log('user disconnected');
         // remove this player from our players object
         delete players[socket.id];
         // emit a message to all players to remove this player
         io.emit('disconnect', socket.id);
+        Object.keys(bullets[socket.id]).forEach(function(key){
+            socket.broadcast.emit('bulletDestroyed', {bulletId:key, playerId: socket.id,})
+        });
     });
 
     // when a player moves, update the player data
@@ -81,15 +84,15 @@ io.on('connection', function (socket) {
         io.emit('scoreUpdate', scores);
     });
     socket.on('bulletMovement', function(bulletData){
-        // console.log({ msg: 'bulletMovement', socket: socket.id, bullet: bulletData });
         socket.broadcast.emit('bulletMoved', bulletData)
     });
     socket.on('bulletCreated', function(bulletData){
-        // console.log({ msg: 'bulletCreated', socket: socket.id, bullet: bulletData });
         socket.broadcast.emit('bulletCreate', bulletData)
+        bullets[bulletData.playerId][bulletData.bulletId]=bulletData.bulletId
     });
     socket.on('bulletDestroyed', function(bulletData){
         socket.broadcast.emit('bulletDestroyed', bulletData)
+        delete bullets[bulletData.playerId][bulletData.bulletId]
     });
     socket.on('playerHit', function(playerId){
         io.emit('playerHit', {playerId: playerId, players:players})
@@ -97,5 +100,4 @@ io.on('connection', function (socket) {
 });
 
 server.listen(2733, function () {
-    console.log(`Listening on ${server.address().port}`);
 });
